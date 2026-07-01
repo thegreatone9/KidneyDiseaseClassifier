@@ -1,0 +1,612 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Kidney CT Scan Classifier</title>
+  <meta name="description" content="Upload a kidney CT scan image to classify it as Normal or Tumor using deep learning." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-size: 15px;
+      line-height: 1.6;
+      color: #1e293b;
+      background-color: #fafbfc;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 48px 20px 32px;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 560px;
+    }
+
+    /* ── Header ── */
+    .header {
+      text-align: center;
+      margin-bottom: 32px;
+    }
+
+    .header h1 {
+      font-size: 26px;
+      font-weight: 700;
+      color: #0f172a;
+      letter-spacing: -0.3px;
+      margin-bottom: 8px;
+    }
+
+    .header p {
+      font-size: 15px;
+      color: #64748b;
+      font-weight: 400;
+    }
+
+    /* ── Card ── */
+    .card {
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 12px;
+      padding: 24px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.06);
+    }
+
+    /* ── Upload Area ── */
+    .upload-area {
+      border: 2px dashed #cbd5e1;
+      border-radius: 10px;
+      background: #f8fafc;
+      padding: 40px 24px;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color 0.2s ease, background-color 0.2s ease;
+      position: relative;
+    }
+
+    .upload-area:hover {
+      border-color: #94a3b8;
+    }
+
+    .upload-area.drag-over {
+      border-color: #0d9488;
+      background: #f0fdfa;
+    }
+
+    .upload-area.has-preview {
+      padding: 16px;
+      border-style: solid;
+      border-color: #e2e8f0;
+      background: #ffffff;
+    }
+
+    .upload-icon {
+      display: block;
+      margin: 0 auto 16px;
+      color: #94a3b8;
+    }
+
+    .upload-prompt h3 {
+      font-size: 15px;
+      font-weight: 600;
+      color: #334155;
+      margin-bottom: 4px;
+    }
+
+    .upload-prompt p {
+      font-size: 13px;
+      color: #94a3b8;
+      font-weight: 400;
+    }
+
+    .upload-prompt .browse-link {
+      color: #0d9488;
+      font-weight: 500;
+    }
+
+    .file-input {
+      display: none;
+    }
+
+    /* ── Preview ── */
+    .preview-wrapper {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .preview-wrapper.visible {
+      display: flex;
+    }
+
+    .preview-img {
+      max-width: 100%;
+      max-height: 320px;
+      border-radius: 8px;
+      object-fit: contain;
+    }
+
+    .preview-filename {
+      font-size: 13px;
+      color: #64748b;
+      font-weight: 500;
+    }
+
+    .change-btn {
+      font-size: 13px;
+      color: #0d9488;
+      font-weight: 500;
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 0;
+      transition: color 0.2s ease;
+    }
+
+    .change-btn:hover {
+      color: #14b8a6;
+    }
+
+    /* ── Analyze Button ── */
+    .analyze-btn {
+      display: block;
+      width: 100%;
+      height: 48px;
+      margin-top: 20px;
+      background: #0d9488;
+      color: #ffffff;
+      font-family: 'Inter', sans-serif;
+      font-size: 15px;
+      font-weight: 600;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background-color 0.2s ease, opacity 0.2s ease, transform 0.1s ease;
+      letter-spacing: 0.1px;
+    }
+
+    .analyze-btn:hover:not(:disabled) {
+      background: #14b8a6;
+    }
+
+    .analyze-btn:active:not(:disabled) {
+      transform: scale(0.99);
+    }
+
+    .analyze-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    /* ── Loading Overlay ── */
+    .loading-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(250, 251, 252, 0.8);
+      backdrop-filter: blur(4px);
+      z-index: 100;
+      justify-content: center;
+      align-items: center;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .loading-overlay.visible {
+      display: flex;
+    }
+
+    .spinner {
+      width: 40px;
+      height: 40px;
+      border: 3px solid #e2e8f0;
+      border-top-color: #0d9488;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .loading-overlay p {
+      font-size: 14px;
+      color: #64748b;
+      font-weight: 500;
+    }
+
+    /* ── Result Card ── */
+    .result-card {
+      display: none;
+      margin-top: 20px;
+      text-align: center;
+      padding: 28px 24px;
+    }
+
+    .result-card.visible {
+      display: block;
+      animation: fadeUp 0.35s ease;
+    }
+
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(10px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .result-label {
+      font-size: 13px;
+      font-weight: 500;
+      color: #94a3b8;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      margin-bottom: 14px;
+    }
+
+    .result-badge {
+      display: inline-block;
+      padding: 10px 28px;
+      border-radius: 8px;
+      font-size: 18px;
+      font-weight: 700;
+      letter-spacing: 0.2px;
+    }
+
+    .result-badge.normal {
+      background: #ecfdf5;
+      color: #059669;
+    }
+
+    .result-badge.tumor {
+      background: #fef2f2;
+      color: #dc2626;
+    }
+
+    /* ── Samples Section ── */
+    .samples-section {
+      margin-top: 20px;
+    }
+
+    .samples-label {
+      font-size: 13px;
+      font-weight: 500;
+      color: #94a3b8;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      margin-bottom: 12px;
+      text-align: center;
+    }
+
+    .samples-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+    }
+
+    .sample-item {
+      position: relative;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 2px solid #e2e8f0;
+      cursor: pointer;
+      transition: border-color 0.2s ease, transform 0.15s ease, box-shadow 0.2s ease;
+      aspect-ratio: 1;
+    }
+
+    .sample-item:hover {
+      border-color: #0d9488;
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(13, 148, 136, 0.15);
+    }
+
+    .sample-item.selected {
+      border-color: #0d9488;
+      box-shadow: 0 0 0 2px rgba(13, 148, 136, 0.25);
+    }
+
+    .sample-item img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    .sample-tag {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      padding: 4px 0;
+      font-size: 10px;
+      font-weight: 600;
+      text-align: center;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      background: rgba(0, 0, 0, 0.55);
+      color: #ffffff;
+      backdrop-filter: blur(4px);
+    }
+
+    /* ── Footer ── */
+    .footer {
+      margin-top: 40px;
+      text-align: center;
+      font-size: 13px;
+      color: #94a3b8;
+      font-weight: 400;
+    }
+
+    /* ── Responsive ── */
+    @media (max-width: 480px) {
+      body {
+        padding: 32px 16px 24px;
+      }
+
+      .header h1 {
+        font-size: 22px;
+      }
+
+      .upload-area {
+        padding: 32px 16px;
+      }
+
+      .card {
+        padding: 20px;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <!-- Header -->
+    <header class="header">
+      <h1>Kidney CT Scan Classifier</h1>
+      <p>Upload a kidney CT scan image to classify it as Normal or Tumor</p>
+    </header>
+
+    <!-- Upload Card -->
+    <div class="card" id="uploadCard">
+      <div class="upload-area" id="uploadArea">
+        <!-- Upload Prompt -->
+        <div class="upload-prompt" id="uploadPrompt">
+          <svg class="upload-icon" xmlns="http://www.w3.org/2000/svg" width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+            <polyline points="17 8 12 3 7 8"/>
+            <line x1="12" y1="3" x2="12" y2="15"/>
+          </svg>
+          <h3>Drop your CT scan here</h3>
+          <p>or <span class="browse-link">browse</span> to upload</p>
+        </div>
+
+        <!-- Preview -->
+        <div class="preview-wrapper" id="previewWrapper">
+          <img class="preview-img" id="previewImg" src="" alt="CT scan preview" />
+          <button type="button" class="change-btn" id="changeBtn">Change image</button>
+        </div>
+
+        <input type="file" class="file-input" id="fileInput" accept="image/*" />
+      </div>
+
+      <!-- Analyze Button -->
+      <button type="button" class="analyze-btn" id="analyzeBtn" disabled>Analyze</button>
+    </div>
+
+    <!-- Result Card -->
+    <div class="card result-card" id="resultCard">
+      <div class="result-label">Classification Result</div>
+      <span class="result-badge" id="resultBadge"></span>
+    </div>
+
+    <!-- Sample Images -->
+    <div class="samples-section">
+      <div class="samples-label">Or try a sample</div>
+      <div class="samples-grid">
+        <div class="sample-item" data-src="/static/samples/normal_1.jpg" data-name="Sample 1">
+          <img src="/static/samples/normal_1.jpg" alt="Kidney CT scan sample" loading="lazy" />
+        </div>
+        <div class="sample-item" data-src="/static/samples/tumor_1.jpg" data-name="Sample 2">
+          <img src="/static/samples/tumor_1.jpg" alt="Kidney CT scan sample" loading="lazy" />
+        </div>
+        <div class="sample-item" data-src="/static/samples/normal_2.jpg" data-name="Sample 3">
+          <img src="/static/samples/normal_2.jpg" alt="Kidney CT scan sample" loading="lazy" />
+        </div>
+        <div class="sample-item" data-src="/static/samples/tumor_2.jpg" data-name="Sample 4">
+          <img src="/static/samples/tumor_2.jpg" alt="Kidney CT scan sample" loading="lazy" />
+        </div>
+        <div class="sample-item" data-src="/static/samples/normal_3.jpg" data-name="Sample 5">
+          <img src="/static/samples/normal_3.jpg" alt="Kidney CT scan sample" loading="lazy" />
+        </div>
+        <div class="sample-item" data-src="/static/samples/tumor_3.jpg" data-name="Sample 6">
+          <img src="/static/samples/tumor_3.jpg" alt="Kidney CT scan sample" loading="lazy" />
+        </div>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="footer">Powered by VGG16 · TensorFlow</footer>
+  </div>
+
+  <!-- Loading Overlay -->
+  <div class="loading-overlay" id="loadingOverlay">
+    <div class="spinner"></div>
+    <p>Analyzing scan…</p>
+  </div>
+
+  <script>
+    (() => {
+      // Elements
+      const uploadArea     = document.getElementById('uploadArea');
+      const uploadPrompt   = document.getElementById('uploadPrompt');
+      const previewWrapper = document.getElementById('previewWrapper');
+      const previewImg     = document.getElementById('previewImg');
+
+      const changeBtn      = document.getElementById('changeBtn');
+      const fileInput      = document.getElementById('fileInput');
+      const analyzeBtn     = document.getElementById('analyzeBtn');
+      const resultCard     = document.getElementById('resultCard');
+      const resultBadge    = document.getElementById('resultBadge');
+      const loadingOverlay = document.getElementById('loadingOverlay');
+
+      let base_data = "";
+
+      // ── File Processing ──
+      function processFile(file) {
+        if (!file || !file.type.startsWith('image/')) return;
+
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const img = new Image();
+          img.onload = () => {
+            const canvas = document.createElement('canvas');
+            canvas.width = img.width;
+            canvas.height = img.height;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0);
+            const dataURL = canvas.toDataURL('image/jpeg', 1.0);
+            base_data = dataURL.replace(/^data:image\/jpeg;base64,/, '');
+
+            // Show preview
+            previewImg.src = e.target.result;
+
+            uploadPrompt.style.display = 'none';
+            previewWrapper.classList.add('visible');
+            uploadArea.classList.add('has-preview');
+
+            // Enable button
+            analyzeBtn.disabled = false;
+
+            // Hide previous result
+            resultCard.classList.remove('visible');
+          };
+          img.src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+      }
+
+      // ── Click to Upload ──
+      uploadArea.addEventListener('click', (e) => {
+        if (e.target === changeBtn || e.target === fileInput) return;
+        fileInput.click();
+      });
+
+      changeBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        fileInput.click();
+      });
+
+      fileInput.addEventListener('change', () => {
+        if (fileInput.files.length > 0) {
+          processFile(fileInput.files[0]);
+          document.querySelectorAll('.sample-item').forEach(s => s.classList.remove('selected'));
+        }
+      });
+
+      // ── Drag and Drop ──
+      uploadArea.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        uploadArea.classList.add('drag-over');
+      });
+
+      uploadArea.addEventListener('dragleave', (e) => {
+        e.preventDefault();
+        uploadArea.classList.remove('drag-over');
+      });
+
+      uploadArea.addEventListener('drop', (e) => {
+        e.preventDefault();
+        uploadArea.classList.remove('drag-over');
+        if (e.dataTransfer.files.length > 0) {
+          processFile(e.dataTransfer.files[0]);
+          document.querySelectorAll('.sample-item').forEach(s => s.classList.remove('selected'));
+        }
+      });
+
+      // ── Sample Images ──
+      document.querySelectorAll('.sample-item').forEach(item => {
+        item.addEventListener('click', () => {
+          const src = item.dataset.src;
+          const name = item.dataset.name;
+
+          // Highlight selected sample
+          document.querySelectorAll('.sample-item').forEach(s => s.classList.remove('selected'));
+          item.classList.add('selected');
+
+          // Load sample image onto a canvas to get base64
+          const img = new Image();
+          img.crossOrigin = 'anonymous';
+          img.onload = () => {
+            const canvas = document.createElement('canvas');
+            canvas.width = img.width;
+            canvas.height = img.height;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0);
+            const dataURL = canvas.toDataURL('image/jpeg', 1.0);
+            base_data = dataURL.replace(/^data:image\/jpeg;base64,/, '');
+
+            // Show preview
+            previewImg.src = src;
+
+            uploadPrompt.style.display = 'none';
+            previewWrapper.classList.add('visible');
+            uploadArea.classList.add('has-preview');
+
+            // Enable button
+            analyzeBtn.disabled = false;
+
+            // Hide previous result
+            resultCard.classList.remove('visible');
+          };
+          img.src = src;
+        });
+      });
+
+      // ── Analyze ──
+      analyzeBtn.addEventListener('click', async () => {
+        if (!base_data) return;
+
+        loadingOverlay.classList.add('visible');
+        resultCard.classList.remove('visible');
+
+        try {
+          const response = await fetch('/predict', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ image: base_data })
+          });
+
+          const result = await response.json();
+          const classification = result[0].image;
+
+          // Display result
+          resultBadge.textContent = classification;
+          resultBadge.className = 'result-badge';
+
+          if (classification === 'Normal') {
+            resultBadge.classList.add('normal');
+          } else {
+            resultBadge.classList.add('tumor');
+          }
+
+          resultCard.classList.add('visible');
+        } catch (err) {
+          alert('Failed to get prediction. Please try again.');
+          console.error(err);
+        } finally {
+          loadingOverlay.classList.remove('visible');
+        }
+      });
+    })();
+  </script>
+</body>
+</html>

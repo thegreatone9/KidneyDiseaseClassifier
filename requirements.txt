@@ -1,0 +1,9 @@
+tensorflow
+numpy
+python-box==6.0.2
+pyYAML
+Flask
+Flask-Cors
+gdown
+mlflow
+-e .
